@@ -27,7 +27,7 @@ RUN sed -i 's/\r$//g' docker-entrypoint.sh && \
 
 COPY app ./app
 COPY --from=builder /metube/dist/metube ./ui/dist/metube
-COPY ../../yt-dlp/yt-dlp /usr/local/bin/yt-dlp
+COPY /usr/local/bin/yt-dlp /usr/local/bin/yt-dlp
 
 ENV UID=1000
 ENV GID=1000
