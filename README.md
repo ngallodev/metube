@@ -302,6 +302,49 @@ pipenv install
 pipenv run python3 app/main.py
 ```
 
+### Using a custom yt-dlp fork
+
+If you want to use a custom or modified version of yt-dlp instead of the official release, you can configure MeTube to use your GitHub repository:
+
+1. **Edit the Pipfile** to point to your custom yt-dlp repository:
+
+```toml
+# Replace 'yourusername' with your actual GitHub username/organization
+yt-dlp = { git = "https://github.com/yourusername/yt-dlp.git", extras = ["default", "curl-cffi"] }
+```
+
+2. **Install the custom version**:
+
+```bash
+# Reinstall dependencies with your custom yt-dlp
+pipenv install --dev
+```
+
+3. **Optional: Use a specific branch or commit**:
+
+```toml
+# For a specific branch
+yt-dlp = { git = "https://github.com/yourusername/yt-dlp.git", ref = "your-branch", extras = ["default", "curl-cffi"] }
+
+# For a specific commit
+yt-dlp = { git = "https://github.com/yourusername/yt-dlp.git", ref = "abc123def", extras = ["default", "curl-cffi"] }
+```
+
+4. **Alternative: Use a local development version**:
+
+```toml
+# For local development (if you have yt-dlp cloned locally)
+yt-dlp = { path = "../../yt-dlp", editable = true, extras = ["default", "curl-cffi"] }
+```
+
+This is useful for:
+- Testing experimental yt-dlp features
+- Using custom extractors or modifications
+- Contributing to yt-dlp development
+- Working with private or enterprise forks
+
+**Note**: When using a custom yt-dlp fork, you're responsible for keeping it updated and ensuring compatibility with MeTube.
+
 A Docker image can be built locally (it will build the UI too):
 
 ```bash
