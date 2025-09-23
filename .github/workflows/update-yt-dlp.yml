@@ -26,7 +26,11 @@ jobs:
           VER=`pipenv run pip list -o | awk '$1 == "yt-dlp" {print $3}'`
           if [ -n "$VER" ]; then
             pipenv update yt-dlp[default,curl-cffi]
+<<<<<<< HEAD
             pipenv install
+=======
+            pipenv lock
+>>>>>>> master
             git config --global user.email "updater@metube"
             git config --global user.name "AutoUpdater"
             git commit -m 'upgraded yt-dlp' Pipfile.lock
