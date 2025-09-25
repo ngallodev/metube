@@ -296,10 +296,10 @@ npm install
 node_modules/.bin/ng build
 # install python dependencies
 cd ..
-pip3 install pipenv
-pipenv install
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv sync
 # run
-pipenv run python3 app/main.py
+uv run python3 app/main.py
 ```
 
 ### Using a custom yt-dlp fork
