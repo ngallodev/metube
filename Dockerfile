@@ -10,22 +10,22 @@ FROM python:3.13-alpine
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock docker-entrypoint.sh ./
+COPY Pipfile Pipfile.lock docker-entrypoint.sh ./
 
 # Use sed to strip carriage-return characters from the entrypoint script (in case building on Windows)
 # Install dependencies
 RUN sed -i 's/\r$//g' docker-entrypoint.sh && \
     chmod +x docker-entrypoint.sh && \
-    apk add --update ffmpeg aria2 coreutils shadow su-exec curl tini deno && \
-    apk add --update --virtual .build-deps gcc g++ musl-dev uv && \
-    UV_PROJECT_ENVIRONMENT=/usr/local uv sync --frozen --no-dev --compile-bytecode && \
+    apk add --update ffmpeg aria2 coreutils shadow su-exec curl tini deno git && \
+    apk add --update --virtual .build-deps gcc g++ musl-dev && \
+    pip install pipenv && \
+    pipenv install --system --dev && \
     apk del .build-deps && \
     rm -rf /var/cache/apk/* && \
     mkdir /.cache && chmod 777 /.cache
 
 COPY app ./app
 COPY --from=builder /metube/dist/metube ./ui/dist/metube
-COPY /usr/local/bin/yt-dlp /usr/local/bin/yt-dlp
 
 ENV UID=1000
 ENV GID=1000
