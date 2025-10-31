@@ -1,7 +1,7 @@
 import { Component, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { faTrashAlt, faCheckCircle, faTimesCircle, IconDefinition } from '@fortawesome/free-regular-svg-icons';
-import { faRedoAlt, faSun, faMoon, faCircleHalfStroke, faCheck, faExternalLinkAlt, faDownload, faFileImport, faFileExport, faCopy, faClock, faTachometerAlt } from '@fortawesome/free-solid-svg-icons';
+import { faRedoAlt, faSun, faMoon, faCircleHalfStroke, faCheck, faExternalLinkAlt, faDownload, faFileImport, faFileExport, faCopy, faClock, faTachometerAlt, faSync } from '@fortawesome/free-solid-svg-icons';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import { CookieService } from 'ngx-cookie-service';
 import { map, Observable, of, distinctUntilChanged } from 'rxjs';
@@ -67,6 +67,7 @@ export class AppComponent implements AfterViewInit {
   faCheckCircle = faCheckCircle;
   faTimesCircle = faTimesCircle;
   faRedoAlt = faRedoAlt;
+  faSync = faSync;
   faSun = faSun;
   faMoon = faMoon;
   faCheck = faCheck;
@@ -282,6 +283,11 @@ export class AppComponent implements AfterViewInit {
 
   retryDownload(key: string, download: Download) {
     this.addDownload(download.url, download.quality, download.format, download.folder, download.custom_name_prefix, download.playlist_strict_mode, download.playlist_item_limit, true);
+    this.downloads.delById('done', [key]).subscribe();
+  }
+
+  retryDownloadPlain(key: string, download: Download) {
+    this.downloads.addPlain(download.url, download.quality, download.format, download.folder, download.custom_name_prefix, download.playlist_strict_mode, download.playlist_item_limit, true).subscribe();
     this.downloads.delById('done', [key]).subscribe();
   }
 

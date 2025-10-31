@@ -116,6 +116,12 @@ export class DownloadsService {
     );
   }
 
+  public addPlain(url: string, quality: string, format: string, folder: string, customNamePrefix: string, playlistStrictMode: boolean, playlistItemLimit: number, autoStart: boolean) {
+    return this.http.post<Status>('add-plain', {url: url, quality: quality, format: format, folder: folder, custom_name_prefix: customNamePrefix, playlist_strict_mode: playlistStrictMode, playlist_item_limit: playlistItemLimit, auto_start: autoStart}).pipe(
+      catchError(this.handleHTTPError)
+    );
+  }
+
   public startById(ids: string[]) {
     return this.http.post('start', {ids: ids});
   }

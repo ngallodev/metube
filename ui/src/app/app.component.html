@@ -447,7 +447,8 @@
           </td>
           <td>
             <div class="d-flex">
-              <button *ngIf="download.value.status == 'error'" type="button" class="btn btn-link" (click)="retryDownload(download.key, download.value)"><fa-icon [icon]="faRedoAlt"></fa-icon></button>
+              <button *ngIf="download.value.status == 'error'" type="button" class="btn btn-link" (click)="retryDownload(download.key, download.value)" ngbTooltip="Retry with custom options"><fa-icon [icon]="faRedoAlt"></fa-icon></button>
+              <button *ngIf="download.value.status == 'error'" type="button" class="btn btn-link" (click)="retryDownloadPlain(download.key, download.value)" ngbTooltip="Retry with plain yt-dlp (no custom options)"><fa-icon [icon]="faSync"></fa-icon></button>
               <a *ngIf="download.value.filename" href="{{buildDownloadLink(download.value)}}" download class="btn btn-link"><fa-icon [icon]="faDownload"></fa-icon></a>
               <a href="{{download.value.url}}" target="_blank" class="btn btn-link"><fa-icon [icon]="faExternalLinkAlt"></fa-icon></a>
               <button type="button" class="btn btn-link" (click)="delDownload('done', download.key)"><fa-icon [icon]="faTrashAlt"></fa-icon></button>
