@@ -1,60 +1,3 @@
-<<<<<<< Updated upstream
-FROM node:lts-alpine AS builder
-
-WORKDIR /metube
-COPY ui ./
-COPY yt-dlp.conf ./yt-dlp.conf
-
-RUN npm install && \
-    node_modules/.bin/ng build --configuration production
-
-
-FROM python:3.13-alpine
-
-WORKDIR /app
-
-COPY Pipfile.local-yt-dlp Pipfile.local-yt-dlp.lock docker-entrypoint.sh yt-dlp.conf ./
-RUN mv Pipfile.local-yt-dlp Pipfile && mv Pipfile.local-yt-dlp.lock Pipfile.lock
-RUN mkdir .config && mkdir .config/yt-dlp && mv yt-dlp.conf .config/yt-dlp/conf
-
-# Use sed to strip carriage-return characters from the entrypoint script (in case building on Windows)
-# Install dependencies
-RUN sed -i 's/\r$//g' docker-entrypoint.sh && \
-    chmod +x docker-entrypoint.sh && \
-    apk add --update ffmpeg aria2 coreutils shadow su-exec curl tini deno git && \
-    apk add --update --virtual .build-deps gcc g++ musl-dev && \
-    pip install pipenv && \
-    pipenv install --system --dev && \
-    apk del .build-deps && \
-    rm -rf /var/cache/apk/* && \
-    mkdir /.cache && chmod 777 /.cache 
-
-# Copy the local yt-dlp binary from the build context
-COPY yt-dlp /usr/local/bin/yt-dlp
-RUN chmod +x /usr/local/bin/yt-dlp
-
-
-ENV PYTHONPATH="/usr/local/bin/yt-dlp:${PYTHONPATH}"
-
-COPY app ./app
-COPY --from=builder /metube/dist/metube ./ui/dist/metube
-
-ENV UID=1000 \
-    GID=1000 \
-    UMASK=022 \
-    DOWNLOAD_DIR=/downloads \
-    STATE_DIR=/downloads/.metube \
-    TEMP_DIR=/downloads
-VOLUME /downloads
-EXPOSE 8081
-
-# Add build-time argument for version
-ARG VERSION=1
-ENV METUBE_VERSION=$VERSION
-
-
-ENTRYPOINT ["/sbin/tini", "-g", "--", "./docker-entrypoint.sh"]
-=======
 FROM node:lts-alpine AS builder
 
 WORKDIR /metube
@@ -110,4 +53,3 @@ ENV METUBE_VERSION=$VERSION
 
 
 ENTRYPOINT ["/sbin/tini", "-g", "--", "./docker-entrypoint.sh"]
->>>>>>> Stashed changes
