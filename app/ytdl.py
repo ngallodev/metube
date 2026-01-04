@@ -33,7 +33,7 @@ class DownloadQueueNotifier:
 class DownloadInfo:
     def __init__(self, id, title, url, quality, format, folder, custom_name_prefix, error, entry, playlist_item_limit):
         self.id = id if len(custom_name_prefix) == 0 else f'{custom_name_prefix}.{id}'
-        self.id = f'{self.id}.{format}'
+        self.id = f'{id}.{format}'
         self.title = title if len(custom_name_prefix) == 0 else f'{custom_name_prefix}.{title}'
         self.url = url
         self.quality = quality
@@ -252,6 +252,7 @@ class PersistentQueue:
 
     def put(self, value):
         key = value.info.id
+        key = value.info.id
         self.dict[key] = value
         with shelve.open(self.path, 'w') as shelf:
             shelf[key] = value.info
@@ -336,7 +337,10 @@ class DownloadQueue:
         download.close()
         if self.queue.exists(download.info.id):
             self.queue.delete(download.info.id)
+        if self.queue.exists(download.info.id):
+            self.queue.delete(download.info.id)
             if download.canceled:
+                asyncio.create_task(self.notifier.canceled(download.info.id))
                 asyncio.create_task(self.notifier.canceled(download.info.id))
             else:
                 self.done.put(download)
@@ -446,53 +450,6 @@ class DownloadQueue:
             return {'status': 'ok'}
         elif etype == 'video' or (etype.startswith('url') and 'id' in entry and 'title' in entry):
             log.debug('Processing as a video')
-            key = entry.get('webpage_url') or entry['url']
-            if not self.queue.exists(key):
-                # if not self.queue.exists(dl.id):
-                dl = DownloadInfo(entry['id'], entry.get('title') or entry['id'], key, quality, format, folder, custom_name_prefix, error, entry, playlist_item_limit)
-                await self.__add_download(dl, auto_start)
-            return {'status': 'ok'}
-        return {'status': 'error', 'msg': f'Unsupported resource "{etype}"'}
-
-    async def __add_entry_plain(self, entry, quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start, already):
-        if not entry:
-            return {'status': 'error', 'msg': "Invalid/empty data was given."}
-
-        error = None
-        if "live_status" in entry and "release_timestamp" in entry and entry.get("live_status") == "is_upcoming":
-            dt_ts = datetime.fromtimestamp(entry.get("release_timestamp")).strftime('%Y-%m-%d %H:%M:%S %z')
-            error = f"Live stream is scheduled to start at {dt_ts}"
-        else:
-            if "msg" in entry:
-                error = entry["msg"]
-
-        etype = entry.get('_type') or 'video'
-
-        if etype.startswith('url'):
-            log.debug('Processing as an url (plain)')
-            return await self.add_plain(entry['url'], quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start, already)
-        elif etype == 'playlist':
-            log.debug('Processing as a playlist (plain)')
-            entries = entry['entries']
-            log.info(f'playlist detected with {len(entries)} entries')
-            playlist_index_digits = len(str(len(entries)))
-            results = []
-            if playlist_item_limit > 0:
-                log.info(f'Playlist item limit is set. Processing only first {playlist_item_limit} entries')
-                entries = entries[:playlist_item_limit]
-            for index, etr in enumerate(entries, start=1):
-                etr["_type"] = "video"
-                etr["playlist"] = entry["id"]
-                etr["playlist_index"] = '{{0:0{0:d}d}}'.format(playlist_index_digits).format(index)
-                for property in ("id", "title", "uploader", "uploader_id"):
-                    if property in entry:
-                        etr[f"playlist_{property}"] = entry[property]
-                results.append(await self.__add_entry_plain(etr, quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start, already))
-            if any(res['status'] == 'error' for res in results):
-                return {'status': 'error', 'msg': ', '.join(res['msg'] for res in results if res['status'] == 'error' and 'msg' in res)}
-            return {'status': 'ok'}
-        elif etype == 'video' or (etype.startswith('url') and 'id' in entry and 'title' in entry):
-            log.debug('Processing as a video (plain)')
             url = entry.get('webpage_url') or entry['url']
             dl = DownloadInfo(entry['id'], entry.get('title') or entry['id'], url, quality, format, folder, custom_name_prefix, error)
             if not self.queue.exists(dl.id):
