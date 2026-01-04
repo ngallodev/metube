@@ -1,7 +1,11 @@
 import { Component, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { faTrashAlt, faCheckCircle, faTimesCircle, IconDefinition } from '@fortawesome/free-regular-svg-icons';
+<<<<<<< Updated upstream
 import { faRedoAlt, faSun, faMoon, faCircleHalfStroke, faCheck, faExternalLinkAlt, faDownload, faFileImport, faFileExport, faCopy, faClock, faTachometerAlt } from '@fortawesome/free-solid-svg-icons';
+=======
+import { faRedoAlt, faSun, faMoon, faCircleHalfStroke, faCheck, faExternalLinkAlt, faDownload, faFileImport, faFileExport, faCopy, faClock, faTachometerAlt, faSync, faEdit } from '@fortawesome/free-solid-svg-icons';
+>>>>>>> Stashed changes
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import { CookieService } from 'ngx-cookie-service';
 import { map, Observable, of, distinctUntilChanged } from 'rxjs';
@@ -44,6 +48,17 @@ export class AppComponent implements AfterViewInit {
   metubeVersion: string | null = null;
   isAdvancedOpen = false;
 
+  // YTDL Options Editor
+  ytdlOptionsEnv: string | null = null;
+  ytdlOptionsFile: any | null = null;
+  ytdlOptionsFilePath: string | null = null;
+  ytdlOptionsFileExists: boolean = false;
+  ytdlOptionsMerged: any | null = null;
+  ytdlOptionsEditorOpen = false;
+  ytdlOptionsEditorText = '';
+  ytdlOptionsEditorError: string | null = null;
+  ytdlOptionsSaving = false;
+
   // Download metrics
   activeDownloads = 0;
   queuedDownloads = 0;
@@ -77,6 +92,7 @@ export class AppComponent implements AfterViewInit {
   faGithub = faGithub;
   faClock = faClock;
   faTachometerAlt = faTachometerAlt;
+  faEdit = faEdit;
 
   constructor(public downloads: DownloadsService, private cookieService: CookieService, private http: HttpClient) {
     this.format = cookieService.get('metube_format') || 'any';
@@ -103,6 +119,7 @@ export class AppComponent implements AfterViewInit {
   ngOnInit() {
     this.getConfiguration();
     this.getYtdlOptionsUpdateTime();
+    this.loadYtdlOptions();
     this.customDirs$ = this.getMatchingCustomDir();
     this.setTheme(this.activeTheme);
 
@@ -182,6 +199,7 @@ export class AppComponent implements AfterViewInit {
         if (data['success']){
           const date = new Date(data['update_time'] * 1000);
           this.ytDlpOptionsUpdateTime=date.toLocaleString();
+          this.loadYtdlOptions();
         }else{
           alert("Error reload yt-dlp options: "+data['msg']);
         }
@@ -509,11 +527,95 @@ export class AppComponent implements AfterViewInit {
     this.queuedDownloads = Array.from(this.downloads.queue.values()).filter(d => d.status === 'pending').length;
     this.completedDownloads = Array.from(this.downloads.done.values()).filter(d => d.status === 'finished').length;
     this.failedDownloads = Array.from(this.downloads.done.values()).filter(d => d.status === 'error').length;
-    
+
     // Calculate total speed from downloading items
     const downloadingItems = Array.from(this.downloads.queue.values())
       .filter(d => d.status === 'downloading');
-    
+
     this.totalSpeed = downloadingItems.reduce((total, item) => total + (item.speed || 0), 0);
+  }
+
+  loadYtdlOptions(): void {
+    this.downloads.getYtdlOptions().subscribe({
+      next: (data) => {
+        this.ytdlOptionsEnv = data.env_options;
+        this.ytdlOptionsFile = data.file_options;
+        this.ytdlOptionsFilePath = data.file_path;
+        this.ytdlOptionsFileExists = data.file_exists;
+        this.ytdlOptionsMerged = data.merged_options;
+      },
+      error: (err) => console.error('Error loading YTDL options:', err)
+    });
+  }
+
+  openYtdlOptionsEditor(source: 'env' | 'file'): void {
+    if (source === 'file') {
+      if (!this.ytdlOptionsFilePath) {
+        alert('YTDL_OPTIONS_FILE is not configured. Set the environment variable to enable editing.');
+        return;
+      }
+      if (!this.ytdlOptionsFileExists) {
+        alert(`File not found: ${this.ytdlOptionsFilePath}`);
+        return;
+      }
+      this.ytdlOptionsEditorText = JSON.stringify(this.ytdlOptionsFile || {}, null, 2);
+    } else {
+      alert('Environment variable YTDL_OPTIONS:\n\n' + (this.ytdlOptionsEnv || '{}') + '\n\n(This cannot be edited from the UI)');
+      return;
+    }
+
+    this.ytdlOptionsEditorOpen = true;
+    this.ytdlOptionsEditorError = null;
+    this.ytdlOptionsSaving = false;
+  }
+
+  closeYtdlOptionsEditor(): void {
+    if (!this.ytdlOptionsSaving) {
+      this.ytdlOptionsEditorOpen = false;
+    }
+  }
+
+  validateYtdlOptionsJson(): void {
+    try {
+      const parsed = JSON.parse(this.ytdlOptionsEditorText);
+      if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+        this.ytdlOptionsEditorError = 'YTDL options must be a JSON object ({})';
+        return;
+      }
+      this.ytdlOptionsEditorError = null;
+    } catch (e) {
+      this.ytdlOptionsEditorError = e.message;
+    }
+  }
+
+  saveYtdlOptions(): void {
+    this.validateYtdlOptionsJson();
+    if (this.ytdlOptionsEditorError) return;
+
+    const parsed = JSON.parse(this.ytdlOptionsEditorText);
+    this.ytdlOptionsSaving = true;
+
+    this.downloads.saveYtdlOptions(parsed).subscribe({
+      next: (response: Status) => {
+        this.ytdlOptionsSaving = false;
+        if (response.status === 'error') {
+          alert('Error saving options: ' + response.msg);
+        } else {
+          this.loadYtdlOptions();
+          this.ytdlOptionsEditorOpen = false;
+          alert('Options saved successfully at ' + new Date().toLocaleTimeString());
+        }
+      },
+      error: (err) => {
+        this.ytdlOptionsSaving = false;
+        alert('Error saving options: ' + (err.error?.msg || 'Unknown error'));
+      }
+    });
+  }
+
+  formatJsonCompact(obj: any, maxLength: number = 50): string {
+    if (!obj) return '{}';
+    const str = JSON.stringify(obj);
+    return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
   }
 }

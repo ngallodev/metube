@@ -344,6 +344,80 @@ def version(request):
         "version": os.getenv("METUBE_VERSION", "dev")
     })
 
+@routes.get(config.URL_PREFIX + 'ytdl_options')
+def ytdl_options(request):
+    """Get current YTDL options from both env var and file"""
+    result = {
+        'env_options': os.environ.get('YTDL_OPTIONS', '{}'),
+        'file_options': None,
+        'file_path': config.YTDL_OPTIONS_FILE or None,
+        'file_exists': False,
+        'merged_options': config.YTDL_OPTIONS
+    }
+
+    if config.YTDL_OPTIONS_FILE:
+        if os.path.exists(config.YTDL_OPTIONS_FILE):
+            result['file_exists'] = True
+            try:
+                with open(config.YTDL_OPTIONS_FILE, 'r') as f:
+                    result['file_options'] = json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                log.error(f"Error reading YTDL_OPTIONS_FILE: {e}")
+                result['file_options'] = None
+
+    return web.json_response(result)
+
+@routes.post(config.URL_PREFIX + 'ytdl_options/save')
+async def save_ytdl_options(request):
+    """Save new YTDL options to file"""
+    if not config.YTDL_OPTIONS_FILE:
+        return web.json_response({
+            'status': 'error',
+            'msg': 'YTDL_OPTIONS_FILE not configured'
+        }, status=400)
+
+    try:
+        post = await request.json()
+        new_options = post.get('options')
+
+        if new_options is None:
+            raise web.HTTPBadRequest(reason='Missing "options" field')
+
+        if not isinstance(new_options, dict):
+            return web.json_response({
+                'status': 'error',
+                'msg': 'Options must be a JSON object (dict)'
+            }, status=400)
+
+    except json.JSONDecodeError as e:
+        return web.json_response({
+            'status': 'error',
+            'msg': f'Invalid JSON: {str(e)}'
+        }, status=400)
+
+    try:
+        with open(config.YTDL_OPTIONS_FILE, 'w') as f:
+            json.dump(new_options, f, indent=2, sort_keys=True)
+
+        log.info(f'Successfully saved YTDL options to {config.YTDL_OPTIONS_FILE}')
+
+        success, msg = config.load_ytdl_options()
+        result = get_options_update_time(success, msg)
+        await sio.emit('ytdl_options_changed', serializer.encode(result))
+
+        return web.json_response({
+            'status': 'success',
+            'msg': 'Options saved successfully',
+            'update_time': result.get('update_time')
+        })
+
+    except IOError as e:
+        log.error(f'Error writing to YTDL_OPTIONS_FILE: {e}')
+        return web.json_response({
+            'status': 'error',
+            'msg': f'Failed to write file: {str(e)}'
+        }, status=500)
+
 if config.URL_PREFIX != '/':
     @routes.get('/')
     def index_redirect_root(request):

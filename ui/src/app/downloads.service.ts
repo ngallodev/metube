@@ -156,6 +156,18 @@ export class DownloadsService {
   public exportQueueUrls(): string[] {
     return Array.from(this.queue.values()).map(download => download.url);
   }
-  
-  
+
+  public getYtdlOptions(): Observable<any> {
+    return this.http.get<any>('ytdl_options').pipe(
+      catchError(this.handleHTTPError)
+    );
+  }
+
+  public saveYtdlOptions(options: any): Observable<Status> {
+    return this.http.post<Status>('ytdl_options/save', { options: options }).pipe(
+      catchError(this.handleHTTPError)
+    );
+  }
+
+
 }

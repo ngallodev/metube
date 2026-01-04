@@ -191,6 +191,51 @@ main
       i
         font-size: 1rem
 
+// YTDL Options footer items
+.version-item
+  &.ytdl-options-env, &.ytdl-options-file
+    cursor: pointer
+    transition: background-color 0.2s ease, transform 0.1s ease
+
+    &:hover
+      background: rgba(255,255,255,0.15)
+      transform: translateY(-1px)
+
+    &:active
+      transform: translateY(0)
+
+  &.ytdl-options-editable
+    .edit-icon
+      opacity: 0.6
+      font-size: 0.7rem
+      transition: opacity 0.2s ease
+
+    &:hover .edit-icon
+      opacity: 1
+
+  &.ytdl-options-missing
+    opacity: 0.7
+    cursor: help
+
+    &:hover
+      background: rgba(255,165,0,0.2)
+
+// YTDL Options Editor Modal
+.ytdl-options-modal
+  .modal-dialog
+    max-width: 800px
+
+  .ytdl-options-textarea
+    font-family: 'Monaco', 'Consolas', 'Courier New', monospace
+    font-size: 0.9rem
+    line-height: 1.5
+    resize: vertical
+    tab-size: 2
+
+  .modal-title small
+    font-size: 0.7rem
+    font-family: monospace
+
 .download-metrics
   display: flex
   align-items: center
