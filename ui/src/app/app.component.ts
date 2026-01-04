@@ -1,11 +1,15 @@
 import { Component, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { faTrashAlt, faCheckCircle, faTimesCircle, IconDefinition } from '@fortawesome/free-regular-svg-icons';
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 import { faRedoAlt, faSun, faMoon, faCircleHalfStroke, faCheck, faExternalLinkAlt, faDownload, faFileImport, faFileExport, faCopy, faClock, faTachometerAlt } from '@fortawesome/free-solid-svg-icons';
 =======
 import { faRedoAlt, faSun, faMoon, faCircleHalfStroke, faCheck, faExternalLinkAlt, faDownload, faFileImport, faFileExport, faCopy, faClock, faTachometerAlt, faSync, faEdit } from '@fortawesome/free-solid-svg-icons';
 >>>>>>> Stashed changes
+=======
+import { faRedoAlt, faSun, faMoon, faCircleHalfStroke, faCheck, faExternalLinkAlt, faDownload, faFileImport, faFileExport, faCopy, faClock, faTachometerAlt, faSync } from '@fortawesome/free-solid-svg-icons';
+>>>>>>> feature/enhanced-batch-import
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import { CookieService } from 'ngx-cookie-service';
 import { map, Observable, of, distinctUntilChanged } from 'rxjs';
@@ -43,6 +47,8 @@ export class AppComponent implements AfterViewInit {
   batchImportStatus = '';
   importInProgress = false;
   cancelImportFlag = false;
+  urlValidationResults: { valid: string[], invalid: string[], duplicates: string[] } = { valid: [], invalid: [], duplicates: [] };
+  parsedUrlCount = 0;
   ytDlpOptionsUpdateTime: string | null = null;
   ytDlpVersion: string | null = null;
   metubeVersion: string | null = null;
@@ -80,6 +86,7 @@ export class AppComponent implements AfterViewInit {
   faCheckCircle = faCheckCircle;
   faTimesCircle = faTimesCircle;
   faRedoAlt = faRedoAlt;
+  faSync = faSync;
   faSun = faSun;
   faMoon = faMoon;
   faCheck = faCheck;
@@ -301,6 +308,11 @@ export class AppComponent implements AfterViewInit {
     this.downloads.delById('done', [key]).subscribe();
   }
 
+  retryDownloadPlain(key: string, download: Download) {
+    this.downloads.addPlain(download.url, download.quality, download.format, download.folder, download.custom_name_prefix, download.playlist_strict_mode, download.playlist_item_limit, true).subscribe();
+    this.downloads.delById('done', [key]).subscribe();
+  }
+
   delDownload(where: string, id: string) {
     this.downloads.delById(where, [id]).subscribe();
   }
@@ -379,6 +391,48 @@ export class AppComponent implements AfterViewInit {
     this.batchImportStatus = '';
     this.importInProgress = false;
     this.cancelImportFlag = false;
+    this.urlValidationResults = { valid: [], invalid: [], duplicates: [] };
+    this.parsedUrlCount = 0;
+  }
+
+  // Validate URLs in real-time as user types
+  validateBatchUrls(): void {
+    const urls = this.batchImportText
+      .split(/\r?\n/)
+      .map(url => url.trim())
+      .filter(url => url.length > 0);
+    
+    this.parsedUrlCount = urls.length;
+    
+    if (urls.length === 0) {
+      this.urlValidationResults = { valid: [], invalid: [], duplicates: [] };
+      return;
+    }
+
+    // Basic URL validation regex
+    const urlRegex = /^https?:\/\/.+/i;
+    const valid: string[] = [];
+    const invalid: string[] = [];
+    const seen = new Set<string>();
+    const duplicates: string[] = [];
+
+    urls.forEach(url => {
+      if (seen.has(url)) {
+        if (!duplicates.includes(url)) {
+          duplicates.push(url);
+        }
+        return;
+      }
+      seen.add(url);
+
+      if (urlRegex.test(url)) {
+        valid.push(url);
+      } else {
+        invalid.push(url);
+      }
+    });
+
+    this.urlValidationResults = { valid, invalid, duplicates };
   }
 
   // Close the Batch Import modal
@@ -388,13 +442,19 @@ export class AppComponent implements AfterViewInit {
 
   // Start importing URLs from the batch modal textarea
   startBatchImport(): void {
-    const urls = this.batchImportText
-      .split(/\r?\n/)
-      .map(url => url.trim())
-      .filter(url => url.length > 0);
+    // Run validation first to get latest results
+    this.validateBatchUrls();
+    
+    const urls = this.urlValidationResults.valid;
     if (urls.length === 0) {
-      alert('No valid URLs found.');
+      alert('No valid URLs found. Please check your URLs and try again.');
       return;
+    }
+    
+    // Show warning if there are invalid URLs
+    if (this.urlValidationResults.invalid.length > 0) {
+      const proceed = confirm(`Found ${this.urlValidationResults.invalid.length} invalid URLs that will be skipped. Continue with ${urls.length} valid URLs?`);
+      if (!proceed) return;
     }
     this.importInProgress = true;
     this.cancelImportFlag = false;

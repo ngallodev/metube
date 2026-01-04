@@ -79,17 +79,25 @@
                 *ngIf="addInProgress"></span>
               {{ addInProgress ? "Adding..." : "Download" }}
             </button>
+<<<<<<< HEAD
 <<<<<<< Updated upstream
 =======
             <!-- <button class="btn btn-outline-primary btn-lg px-3" 
+=======
+            <button class="btn btn-outline-primary btn-lg px-3" 
+>>>>>>> feature/enhanced-batch-import
                     type="button" 
                     (click)="openBatchImportModal()" 
                     [disabled]="addInProgress || downloads.loading"
                     ngbTooltip="Import multiple URLs at once">
               <fa-icon [icon]="faFileImport"></fa-icon>
               Bulk Import
+<<<<<<< HEAD
             </button> -->
 >>>>>>> Stashed changes
+=======
+            </button>
+>>>>>>> feature/enhanced-batch-import
           </div>
         </div>
       </div>
@@ -220,6 +228,7 @@
           <button type="button" class="btn-close" aria-label="Close" (click)="closeBatchImportModal()"></button>
         </div>
         <div class="modal-body">
+<<<<<<< HEAD
 <<<<<<< Updated upstream
           <textarea [(ngModel)]="batchImportText" class="form-control" rows="6"
             placeholder="Paste one video URL per line"></textarea>
@@ -233,6 +242,18 @@
               placeholder="Paste video URLs here, one per line:&#10;https://youtube.com/watch?v=...&#10;https://youtube.com/playlist?list=...&#10;https://youtu.be/..."></textarea>
           </div>
 
+=======
+          <div class="mb-3">
+            <label for="batchImportTextarea" class="form-label">URLs (one per line)</label>
+            <textarea [(ngModel)]="batchImportText" 
+                      (input)="validateBatchUrls()"
+                      class="form-control" 
+                      rows="8" 
+                      id="batchImportTextarea"
+                      placeholder="Paste video URLs here, one per line:&#10;https://youtube.com/watch?v=...&#10;https://youtube.com/playlist?list=...&#10;https://youtu.be/..."></textarea>
+          </div>
+          
+>>>>>>> feature/enhanced-batch-import
           <!-- URL Summary -->
           <div class="url-summary mb-3" *ngIf="parsedUrlCount > 0">
             <div class="row g-2">
@@ -260,10 +281,16 @@
                 </div>
               </div>
             </div>
+<<<<<<< HEAD
 
             <!-- Detailed validation messages -->
             <div class="mt-2"
               *ngIf="urlValidationResults.invalid.length > 0 || urlValidationResults.duplicates.length > 0">
+=======
+            
+            <!-- Detailed validation messages -->
+            <div class="mt-2" *ngIf="urlValidationResults.invalid.length > 0 || urlValidationResults.duplicates.length > 0">
+>>>>>>> feature/enhanced-batch-import
               <details class="small">
                 <summary class="text-muted">Show issues</summary>
                 <div class="mt-2">
@@ -295,7 +322,10 @@
             <div class="alert alert-info mb-0">
               <small>{{ batchImportStatus }}</small>
             </div>
+<<<<<<< HEAD
 >>>>>>> Stashed changes
+=======
+>>>>>>> feature/enhanced-batch-import
           </div>
         </div>
         <div class="modal-footer">
@@ -303,6 +333,7 @@
             Cancel Import
           </button>
           <button type="button" class="btn btn-secondary" (click)="closeBatchImportModal()">Close</button>
+<<<<<<< HEAD
 <<<<<<< Updated upstream
           <button type="button" class="btn btn-primary" (click)="startBatchImport()" [disabled]="importInProgress">
             Import URLs
@@ -313,6 +344,15 @@
             <span class="spinner-border spinner-border-sm me-2" *ngIf="importInProgress"></span>
             {{ importInProgress ? 'Importing...' : 'Import ' + (urlValidationResults.valid.length || 'URLs') }}
 >>>>>>> Stashed changes
+=======
+          <button type="button" 
+                  class="btn btn-primary" 
+                  (click)="startBatchImport()" 
+                  [disabled]="importInProgress || urlValidationResults.valid.length === 0">
+            <fa-icon [icon]="faFileImport" class="me-2" *ngIf="!importInProgress"></fa-icon>
+            <span class="spinner-border spinner-border-sm me-2" *ngIf="importInProgress"></span>
+            {{ importInProgress ? 'Importing...' : 'Import ' + (urlValidationResults.valid.length || 'URLs') }}
+>>>>>>> feature/enhanced-batch-import
           </button>
         </div>
       </div>
@@ -398,7 +438,7 @@
             <app-master-checkbox #queueMasterCheckbox [id]="'queue'" [list]="downloads.queue"
               (changed)="queueSelectionChanged($event)"></app-master-checkbox>
           </th>
-          <th scope="col">Video</th>
+          <th scope="col">Media</th>
           <th scope="col" style="width: 8rem;">Speed</th>
           <th scope="col" style="width: 7rem;">ETA</th>
           <th scope="col" style="width: 6rem;"></th>
@@ -464,7 +504,8 @@
             <app-master-checkbox #doneMasterCheckbox [id]="'done'" [list]="downloads.done"
               (changed)="doneSelectionChanged($event)"></app-master-checkbox>
           </th>
-          <th scope="col">Video</th>
+          <th scope="col">Media</th>
+          <th scope="col">Format</th>
           <th scope="col">File Size</th>
           <th scope="col" style="width: 8rem;"></th>
         </tr>
@@ -488,11 +529,15 @@
             </ng-template>
           </td>
           <td>
+            <span *ngIf="download.value.format">{{ download.value.format }}</span>
+          </td>
+          <td>
             <span *ngIf="download.value.size">{{ download.value.size | fileSize }}</span>
           </td>
           <td>
             <div class="d-flex">
-              <button *ngIf="download.value.status == 'error'" type="button" class="btn btn-link" (click)="retryDownload(download.key, download.value)"><fa-icon [icon]="faRedoAlt"></fa-icon></button>
+              <button *ngIf="download.value.status == 'error'" type="button" class="btn btn-link" (click)="retryDownload(download.key, download.value)" ngbTooltip="Retry with custom options"><fa-icon [icon]="faRedoAlt"></fa-icon></button>
+              <button *ngIf="download.value.status == 'error'" type="button" class="btn btn-link" (click)="retryDownloadPlain(download.key, download.value)" ngbTooltip="Retry with plain yt-dlp (no custom options)"><fa-icon [icon]="faSync"></fa-icon></button>
               <a *ngIf="download.value.filename" href="{{buildDownloadLink(download.value)}}" download class="btn btn-link"><fa-icon [icon]="faDownload"></fa-icon></a>
               <a href="{{download.value.url}}" target="_blank" class="btn btn-link"><fa-icon [icon]="faExternalLinkAlt"></fa-icon></a>
               <button type="button" class="btn btn-link" (click)="delDownload('done', download.key)"><fa-icon [icon]="faTrashAlt"></fa-icon></button>

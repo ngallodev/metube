@@ -115,6 +115,38 @@ __Chrome:__ contributed by [Rpsl](https://github.com/rpsl). You can install it f
 
 __Firefox:__ contributed by [nanocortex](https://github.com/nanocortex). You can install it from [Firefox Addons](https://addons.mozilla.org/en-US/firefox/addon/metube-downloader) or get sources from [here](https://github.com/nanocortex/metube-firefox-addon).
 
+## Bulk Import
+
+MeTube supports importing multiple URLs at once with enhanced validation and feedback:
+
+### Features
+- **Direct Access**: Click the "Bulk Import" button next to the main Download button
+- **Real-time Validation**: See live feedback as you type URLs (✅ Valid, ❌ Invalid, ⚠️ Duplicates)
+- **Smart Filtering**: Only valid URLs are imported, with confirmation for problematic ones
+- **Duplicate Detection**: Automatically identifies and handles duplicate URLs
+- **Professional Interface**: Enhanced modal with monospace font and expandable error details
+- **Progress Tracking**: Monitor import progress with cancellation support
+
+### Usage
+1. Click the **"Bulk Import"** button on the main interface
+2. Paste multiple URLs (one per line) into the textarea
+3. Watch the real-time validation badges show URL status
+4. Review any issues in the expandable "Show issues" section
+5. Click **"Import X"** to process only the valid URLs
+
+### Supported URL Formats
+The bulk import validates URLs using standard HTTP/HTTPS protocols and supports various video platforms:
+- YouTube videos: `https://youtube.com/watch?v=...`, `https://youtu.be/...`
+- YouTube playlists: `https://youtube.com/playlist?list=...`
+- Other video platforms supported by yt-dlp
+- Any valid HTTP/HTTPS URL
+
+### Advanced Features
+- **Error Details**: Expandable section showing specific invalid URLs (limited to first 3 with "and X more" for large lists)
+- **Confirmation Dialogs**: Smart prompts when invalid URLs are detected
+- **Performance Optimized**: Handles hundreds of URLs efficiently
+- **Accessibility**: Full WCAG compliance with proper labels and ARIA attributes
+
 ## 📱 iOS Shortcut
 
 [rithask](https://github.com/rithask) created an iOS shortcut to send URLs to MeTube from Safari. Enter the MeTube instance address when prompted which will be saved for later use. You can run the shortcut from Safari’s share menu. The shortcut can be downloaded from [this iCloud link](https://www.icloud.com/shortcuts/66627a9f334c467baabdb2769763a1a6).
@@ -281,6 +313,49 @@ uv sync
 # run
 uv run python3 app/main.py
 ```
+
+### Using a custom yt-dlp fork
+
+If you want to use a custom or modified version of yt-dlp instead of the official release, you can configure MeTube to use your GitHub repository:
+
+1. **Edit the Pipfile** to point to your custom yt-dlp repository:
+
+```toml
+# Replace 'yourusername' with your actual GitHub username/organization
+yt-dlp = { git = "https://github.com/yourusername/yt-dlp.git", extras = ["default", "curl-cffi"] }
+```
+
+2. **Install the custom version**:
+
+```bash
+# Reinstall dependencies with your custom yt-dlp
+pipenv install --dev
+```
+
+3. **Optional: Use a specific branch or commit**:
+
+```toml
+# For a specific branch
+yt-dlp = { git = "https://github.com/yourusername/yt-dlp.git", ref = "your-branch", extras = ["default", "curl-cffi"] }
+
+# For a specific commit
+yt-dlp = { git = "https://github.com/yourusername/yt-dlp.git", ref = "abc123def", extras = ["default", "curl-cffi"] }
+```
+
+4. **Alternative: Use a local development version**:
+
+```toml
+# For local development (if you have yt-dlp cloned locally)
+yt-dlp = { path = "../../yt-dlp", editable = true, extras = ["default", "curl-cffi"] }
+```
+
+This is useful for:
+- Testing experimental yt-dlp features
+- Using custom extractors or modifications
+- Contributing to yt-dlp development
+- Working with private or enterprise forks
+
+**Note**: When using a custom yt-dlp fork, you're responsible for keeping it updated and ensuring compatibility with MeTube.
 
 A Docker image can be built locally (it will build the UI too):
 

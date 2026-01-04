@@ -238,6 +238,37 @@ async def add(request):
     status = await dqueue.add(url, quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start)
     return web.Response(text=serializer.encode(status))
 
+@routes.post(config.URL_PREFIX + 'add-plain')
+async def add_plain(request):
+    log.info("Received request to add plain download (no custom options)")
+    post = await request.json()
+    log.info(f"Request data: {post}")
+    url = post.get('url')
+    quality = post.get('quality')
+    if not url or not quality:
+        log.error("Bad request: missing 'url' or 'quality'")
+        raise web.HTTPBadRequest()
+    format = post.get('format')
+    folder = post.get('folder')
+    custom_name_prefix = post.get('custom_name_prefix')
+    playlist_strict_mode = post.get('playlist_strict_mode')
+    playlist_item_limit = post.get('playlist_item_limit')
+    auto_start = post.get('auto_start')
+
+    if custom_name_prefix is None:
+        custom_name_prefix = ''
+    if auto_start is None:
+        auto_start = True
+    if playlist_strict_mode is None:
+        playlist_strict_mode = config.DEFAULT_OPTION_PLAYLIST_STRICT_MODE
+    if playlist_item_limit is None:
+        playlist_item_limit = config.DEFAULT_OPTION_PLAYLIST_ITEM_LIMIT
+
+    playlist_item_limit = int(playlist_item_limit)
+
+    status = await dqueue.add_plain(url, quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start)
+    return web.Response(text=serializer.encode(status))
+
 @routes.post(config.URL_PREFIX + 'delete')
 async def delete(request):
     post = await request.json()

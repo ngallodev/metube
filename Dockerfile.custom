@@ -20,7 +20,7 @@ RUN sed -i 's/\r$//g' docker-entrypoint.sh && \
     apk add --update ffmpeg aria2 coreutils shadow su-exec curl tini deno git && \
     apk add --update --virtual .build-deps gcc g++ musl-dev && \
     pip install pipenv && \
-    pipenv install --dev && \
+    pipenv install --system --dev && \
     apk del .build-deps && \
     rm -rf /var/cache/apk/* && \
     mkdir /.cache && chmod 777 /.cache

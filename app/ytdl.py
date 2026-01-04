@@ -33,6 +33,7 @@ class DownloadQueueNotifier:
 class DownloadInfo:
     def __init__(self, id, title, url, quality, format, folder, custom_name_prefix, error, entry, playlist_item_limit):
         self.id = id if len(custom_name_prefix) == 0 else f'{custom_name_prefix}.{id}'
+        self.id = f'{self.id}.{format}'
         self.title = title if len(custom_name_prefix) == 0 else f'{custom_name_prefix}.{title}'
         self.url = url
         self.quality = quality
@@ -53,8 +54,8 @@ class Download:
     def __init__(self, download_dir, temp_dir, output_template, output_template_chapter, quality, format, ytdl_opts, info):
         self.download_dir = download_dir
         self.temp_dir = temp_dir
-        self.output_template = output_template
-        self.output_template_chapter = output_template_chapter
+        self.output_template = self._add_format_identifier(format, output_template)
+        self.output_template_chapter = self._add_format_identifier(format, output_template_chapter)
         self.format = get_format(format, quality)
         self.ytdl_opts = get_opts(format, quality, ytdl_opts)
         if "impersonate" in self.ytdl_opts:
@@ -141,6 +142,8 @@ class Download:
             if self.status_queue is not None:
                 self.status_queue.put(None)
 
+        self._delete_format_identifier()
+
     def running(self):
         try:
             return self.proc is not None and self.proc.is_alive()
@@ -176,6 +179,49 @@ class Download:
             self.info.eta = status.get('eta')
             log.info(f"Updating status for {self.info.title}: {status}")
             await self.notifier.updated(self.info)
+    
+    def _add_format_identifier(self, identifier, template):
+        # Preventing the post-processing of YT-DLP from deleting the intermediate file which was download before.
+        return f'{identifier}_{template}'
+
+    def _delete_format_identifier(self):
+        # Delete the identifier in the file name after the post-processing is complete.
+        if self.canceled or self.info.status != 'finished' or not hasattr(self.info,'filename'):
+            return
+
+        try:
+            filename = re.sub(r'^\w+_', '', self.info.filename)
+            filepath_idt = os.path.join(self.download_dir, self.info.filename)
+            filepath = os.path.join(self.download_dir, filename)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+            os.rename(filepath_idt, filepath)
+            log.info(f"Renamed file '{filepath_idt}' to '{filepath}'")
+        except PermissionError as e:
+            log.warning(f"Error deleting old file '{filepath}': {e} ")
+            return
+        except Exception as e:
+            log.warning(f"Error renaming file '{filepath_idt}': {e} ")
+            return
+
+        self.info.filename = filename
+
+    def delete_tmpfile(self):
+        if not self.tmpfilename or not self.download_dir:
+            return
+        if not os.path.isdir(self.download_dir):
+            return
+
+        tmpfilename = os.path.basename(self.tmpfilename)
+        def is_tmpfile(filename):
+            return filename.startswith(tmpfilename)
+
+        try:
+            tmpfiles = filter(is_tmpfile, os.listdir(self.download_dir))
+            for tmpfile in tmpfiles:
+                os.remove(os.path.join(self.download_dir, tmpfile))
+        except Exception as e:
+            log.warning(f"Error deleting temporary files: {e}")
 
 class PersistentQueue:
     def __init__(self, path):
@@ -205,7 +251,7 @@ class PersistentQueue:
             return sorted(shelf.items(), key=lambda item: item[1].timestamp)
 
     def put(self, value):
-        key = value.info.url
+        key = value.info.id
         self.dict[key] = value
         with shelve.open(self.path, 'w') as shelf:
             shelf[key] = value.info
@@ -285,17 +331,13 @@ class DownloadQueue:
 
     def _post_download_cleanup(self, download):
         if download.info.status != 'finished':
-            if download.tmpfilename and os.path.isfile(download.tmpfilename):
-                try:
-                    os.remove(download.tmpfilename)
-                except:
-                    pass
+            download.delete_tmpfile()
             download.info.status = 'error'
         download.close()
-        if self.queue.exists(download.info.url):
-            self.queue.delete(download.info.url)
+        if self.queue.exists(download.info.id):
+            self.queue.delete(download.info.id)
             if download.canceled:
-                asyncio.create_task(self.notifier.canceled(download.info.url))
+                asyncio.create_task(self.notifier.canceled(download.info.id))
             else:
                 self.done.put(download)
                 asyncio.create_task(self.notifier.completed(download.info))
@@ -310,6 +352,16 @@ class DownloadQueue:
             'paths': {"home": self.config.DOWNLOAD_DIR, "temp": self.config.TEMP_DIR},
             **self.config.YTDL_OPTIONS,
             **({'impersonate': yt_dlp.networking.impersonate.ImpersonateTarget.from_str(self.config.YTDL_OPTIONS['impersonate'])} if 'impersonate' in self.config.YTDL_OPTIONS else {}),
+        }).extract_info(url, download=False)
+
+    def __extract_info_plain(self, url, playlist_strict_mode):
+        return yt_dlp.YoutubeDL(params={
+            'quiet': True,
+            'no_color': True,
+            'extract_flat': True,
+            'ignore_no_formats_error': True,
+            'noplaylist': playlist_strict_mode,
+            'paths': {"home": self.config.DOWNLOAD_DIR, "temp": self.config.TEMP_DIR},
         }).extract_info(url, download=False)
 
     def __calc_download_path(self, quality, format, folder):
@@ -396,8 +448,76 @@ class DownloadQueue:
             log.debug('Processing as a video')
             key = entry.get('webpage_url') or entry['url']
             if not self.queue.exists(key):
+                # if not self.queue.exists(dl.id):
                 dl = DownloadInfo(entry['id'], entry.get('title') or entry['id'], key, quality, format, folder, custom_name_prefix, error, entry, playlist_item_limit)
                 await self.__add_download(dl, auto_start)
+            return {'status': 'ok'}
+        return {'status': 'error', 'msg': f'Unsupported resource "{etype}"'}
+
+    async def __add_entry_plain(self, entry, quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start, already):
+        if not entry:
+            return {'status': 'error', 'msg': "Invalid/empty data was given."}
+
+        error = None
+        if "live_status" in entry and "release_timestamp" in entry and entry.get("live_status") == "is_upcoming":
+            dt_ts = datetime.fromtimestamp(entry.get("release_timestamp")).strftime('%Y-%m-%d %H:%M:%S %z')
+            error = f"Live stream is scheduled to start at {dt_ts}"
+        else:
+            if "msg" in entry:
+                error = entry["msg"]
+
+        etype = entry.get('_type') or 'video'
+
+        if etype.startswith('url'):
+            log.debug('Processing as an url (plain)')
+            return await self.add_plain(entry['url'], quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start, already)
+        elif etype == 'playlist':
+            log.debug('Processing as a playlist (plain)')
+            entries = entry['entries']
+            log.info(f'playlist detected with {len(entries)} entries')
+            playlist_index_digits = len(str(len(entries)))
+            results = []
+            if playlist_item_limit > 0:
+                log.info(f'Playlist item limit is set. Processing only first {playlist_item_limit} entries')
+                entries = entries[:playlist_item_limit]
+            for index, etr in enumerate(entries, start=1):
+                etr["_type"] = "video"
+                etr["playlist"] = entry["id"]
+                etr["playlist_index"] = '{{0:0{0:d}d}}'.format(playlist_index_digits).format(index)
+                for property in ("id", "title", "uploader", "uploader_id"):
+                    if property in entry:
+                        etr[f"playlist_{property}"] = entry[property]
+                results.append(await self.__add_entry_plain(etr, quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start, already))
+            if any(res['status'] == 'error' for res in results):
+                return {'status': 'error', 'msg': ', '.join(res['msg'] for res in results if res['status'] == 'error' and 'msg' in res)}
+            return {'status': 'ok'}
+        elif etype == 'video' or (etype.startswith('url') and 'id' in entry and 'title' in entry):
+            log.debug('Processing as a video (plain)')
+            url = entry.get('webpage_url') or entry['url']
+            dl = DownloadInfo(entry['id'], entry.get('title') or entry['id'], url, quality, format, folder, custom_name_prefix, error)
+            if not self.queue.exists(dl.id):
+                dldirectory, error_message = self.__calc_download_path(quality, format, folder)
+                if error_message is not None:
+                    return error_message
+                output = self.config.OUTPUT_TEMPLATE if len(custom_name_prefix) == 0 else f'{custom_name_prefix}.{self.config.OUTPUT_TEMPLATE}'
+                output_chapter = self.config.OUTPUT_TEMPLATE_CHAPTER
+                if 'playlist' in entry and entry['playlist'] is not None:
+                    if len(self.config.OUTPUT_TEMPLATE_PLAYLIST):
+                        output = self.config.OUTPUT_TEMPLATE_PLAYLIST
+                    for property, value in entry.items():
+                        if property.startswith("playlist"):
+                            output = output.replace(f"%({property})s", str(value))
+                ytdl_options = {}  # Plain download - no custom options
+                if playlist_item_limit > 0:
+                    log.info(f'playlist limit is set. Processing only first {playlist_item_limit} entries')
+                    ytdl_options['playlistend'] = playlist_item_limit
+                if auto_start is True:
+                    download = Download(dldirectory, self.config.TEMP_DIR, output, output_chapter, quality, format, ytdl_options, dl)
+                    self.queue.put(download)
+                    asyncio.create_task(self.__start_download(download))
+                else:
+                    self.pending.put(Download(dldirectory, self.config.TEMP_DIR, output, output_chapter, quality, format, ytdl_options, dl))
+                await self.notifier.added(dl)
             return {'status': 'ok'}
         return {'status': 'error', 'msg': f'Unsupported resource "{etype}"'}
 
@@ -414,6 +534,20 @@ class DownloadQueue:
         except yt_dlp.utils.YoutubeDLError as exc:
             return {'status': 'error', 'msg': str(exc)}
         return await self.__add_entry(entry, quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start, already)
+
+    async def add_plain(self, url, quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start=True, already=None):
+        log.info(f'adding plain {url}: {quality=} {format=} {already=} {folder=} {custom_name_prefix=} {playlist_strict_mode=} {playlist_item_limit=}')
+        already = set() if already is None else already
+        if url in already:
+            log.info('recursion detected, skipping')
+            return {'status': 'ok'}
+        else:
+            already.add(url)
+        try:
+            entry = await asyncio.get_running_loop().run_in_executor(None, self.__extract_info_plain, url, playlist_strict_mode)
+        except yt_dlp.utils.YoutubeDLError as exc:
+            return {'status': 'error', 'msg': str(exc)}
+        return await self.__add_entry_plain(entry, quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start, already)
 
     async def start_pending(self, ids):
         for id in ids:
