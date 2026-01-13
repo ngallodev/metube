@@ -1,0 +1,17 @@
+services:
+  metube:
+    build:
+      context: .
+      dockerfile: Dockerfile.custom
+    container_name: metube2
+    restart: unless-stopped
+    environment:
+      - 'GID=1002'
+      - 'UID=1002'
+      - 'TEMP_DIR=/tmp/metube_tmp'
+      - 'DOWNLOAD_MODE=concurrent'
+    ports:
+      - "8081:8081"
+    volumes:
+      - /lump/share/media/Adult/downloads/metube:/downloads
+      

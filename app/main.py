@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 #!/usr/bin/env python3
 # pylint: disable=no-member,method-hidden
 
@@ -17,6 +18,8 @@ import re
 from watchfiles import DefaultFilter, Change, awatch
 
 from ytdl import DownloadQueueNotifier, DownloadQueue
+from yt_dlp import parse_options as yt_dlp_parse_options
+from yt_dlp.utils import Config as YtDlpConfig
 from yt_dlp.version import __version__ as yt_dlp_version
 
 log = logging.getLogger('main')
@@ -117,17 +120,42 @@ class Config:
             msg = f'File "{self.YTDL_OPTIONS_FILE}" not found'
             log.error(msg)
             return (False, msg)
-        try:
-            with open(self.YTDL_OPTIONS_FILE) as json_data:
-                opts = json.load(json_data)
-            assert isinstance(opts, dict)
-        except (json.decoder.JSONDecodeError, AssertionError):
-            msg = 'YTDL_OPTIONS_FILE contents is invalid'
+
+        opts, msg = self._load_ytdl_options_file()
+        if opts is None:
             log.error(msg)
             return (False, msg)
 
         self.YTDL_OPTIONS.update(opts)
         return (True, '')
+
+    def _load_ytdl_options_file(self) -> tuple[dict | None, str]:
+        try:
+            with open(self.YTDL_OPTIONS_FILE, 'r') as options_file:
+                raw_contents = options_file.read()
+        except OSError as exc:
+            return (None, f'Unable to read YTDL_OPTIONS_FILE: {exc}')
+
+        try:
+            opts = json.loads(raw_contents)
+            if not isinstance(opts, dict):
+                raise ValueError('YTDL_OPTIONS_FILE must be a JSON object')
+            return (opts, '')
+        except (json.decoder.JSONDecodeError, ValueError):
+            pass
+
+        try:
+            args = YtDlpConfig.read_file(self.YTDL_OPTIONS_FILE, default=[])
+            parsed = yt_dlp_parse_options(args)
+            defaults = yt_dlp_parse_options([]).ydl_opts
+            opts = {
+                key: value
+                for key, value in parsed.ydl_opts.items()
+                if key not in defaults or value != defaults[key]
+            }
+            return (opts, '')
+        except Exception as exc:
+            return (None, f'YTDL_OPTIONS_FILE contents is invalid: {exc}')
 
 config = Config()
 # Align root logger level with Config (keeps a single source of truth).
@@ -260,7 +288,38 @@ async def add(request):
 
     playlist_item_limit = int(playlist_item_limit)
 
-    status = await dqueue.add(url, quality, format, folder, custom_name_prefix, playlist_item_limit, auto_start, split_by_chapters, chapter_template)
+    status = await dqueue.add(url, quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start, split_by_chapters, chapter_template)
+    return web.Response(text=serializer.encode(status))
+
+@routes.post(config.URL_PREFIX + 'add-plain')
+async def add_plain(request):
+    log.info("Received request to add plain download (no custom options)")
+    post = await request.json()
+    log.info(f"Request data: {post}")
+    url = post.get('url')
+    quality = post.get('quality')
+    if not url or not quality:
+        log.error("Bad request: missing 'url' or 'quality'")
+        raise web.HTTPBadRequest()
+    format = post.get('format')
+    folder = post.get('folder')
+    custom_name_prefix = post.get('custom_name_prefix')
+    playlist_strict_mode = post.get('playlist_strict_mode')
+    playlist_item_limit = post.get('playlist_item_limit')
+    auto_start = post.get('auto_start')
+
+    if custom_name_prefix is None:
+        custom_name_prefix = ''
+    if auto_start is None:
+        auto_start = True
+    if playlist_strict_mode is None:
+        playlist_strict_mode = config.DEFAULT_OPTION_PLAYLIST_STRICT_MODE
+    if playlist_item_limit is None:
+        playlist_item_limit = config.DEFAULT_OPTION_PLAYLIST_ITEM_LIMIT
+
+    playlist_item_limit = int(playlist_item_limit)
+
+    status = await dqueue.add_plain(url, quality, format, folder, custom_name_prefix, playlist_strict_mode, playlist_item_limit, auto_start)
     return web.Response(text=serializer.encode(status))
 
 @routes.post(config.URL_PREFIX + 'delete')
@@ -369,6 +428,29 @@ def version(request):
         "version": os.getenv("METUBE_VERSION", "dev")
     })
 
+@routes.get(config.URL_PREFIX + 'ytdl_options')
+def ytdl_options(request):
+    """Get current YTDL options from both env var and file"""
+    result = {
+        'env_options': os.environ.get('YTDL_OPTIONS', '{}'),
+        'file_options': None,
+        'file_path': config.YTDL_OPTIONS_FILE or None,
+        'file_exists': False,
+        'merged_options': config.YTDL_OPTIONS
+    }
+
+    if config.YTDL_OPTIONS_FILE:
+        if os.path.exists(config.YTDL_OPTIONS_FILE):
+            result['file_exists'] = True
+            options, msg = config._load_ytdl_options_file()
+            if options is None:
+                log.error(f"Error reading YTDL_OPTIONS_FILE: {msg}")
+                result['file_options'] = None
+            else:
+                result['file_options'] = options
+
+    return web.json_response(result)
+
 if config.URL_PREFIX != '/':
     @routes.get('/')
     def index_redirect_root(request):
@@ -411,6 +493,21 @@ def supports_reuse_port():
     except (AttributeError, OSError):
         return False
 
+def parseLogLevel(logLevel):
+    match logLevel:
+        case 'DEBUG':
+            return logging.DEBUG
+        case 'INFO':
+            return logging.INFO
+        case 'WARNING':
+            return logging.WARNING
+        case 'ERROR':
+            return logging.ERROR
+        case 'CRITICAL':
+            return logging.CRITICAL
+        case _:
+            return None
+
 def isAccessLogEnabled():
     if config.ENABLE_ACCESSLOG:
         return access_logger
@@ -418,7 +515,7 @@ def isAccessLogEnabled():
         return None
 
 if __name__ == '__main__':
-    logging.getLogger().setLevel(parseLogLevel(config.LOGLEVEL) or logging.INFO)
+    logging.basicConfig(level=parseLogLevel(config.LOGLEVEL))
     log.info(f"Listening on {config.HOST}:{config.PORT}")
 
     if config.HTTPS:
@@ -427,3 +524,4 @@ if __name__ == '__main__':
         web.run_app(app, host=config.HOST, port=int(config.PORT), reuse_port=supports_reuse_port(), ssl_context=ssl_context, access_log=isAccessLogEnabled())
     else:
         web.run_app(app, host=config.HOST, port=int(config.PORT), reuse_port=supports_reuse_port(), access_log=isAccessLogEnabled())
+>>>>>>> ytdl_options_config

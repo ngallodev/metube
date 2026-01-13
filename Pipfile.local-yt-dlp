@@ -1,0 +1,19 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+pylint = "*"
+
+[packages]
+aiohttp = "*"
+python-socketio = "~=5.0"
+# yt-dlp = { git = "https://github.com/ngallodev/yt-dlp.git", ref="add-perfectgirls-extractor", extras = ["default", "curl-cffi"] }
+yt-dlp = { path = "./yt-dlp", editable = true, extras = ["default", "curl-cffi"] }
+mutagen = "*"
+curl-cffi = "*"
+watchfiles = "*"
+
+[requires]
+python_version = "3.13"
