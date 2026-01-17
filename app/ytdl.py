@@ -17,6 +17,15 @@ from datetime import datetime
 
 log = logging.getLogger('ytdl')
 
+def _convert_generators_to_lists(obj):
+    if isinstance(obj, types.GeneratorType):
+        return [_convert_generators_to_lists(item) for item in obj]
+    if isinstance(obj, dict):
+        return {k: _convert_generators_to_lists(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return type(obj)(_convert_generators_to_lists(item) for item in obj)
+    return obj
+
 def params_to_cli_command(params, url):
     """Convert yt-dlp params dict to equivalent CLI command for logging"""
     cmd_parts = ['yt-dlp']
