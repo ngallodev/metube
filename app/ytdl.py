@@ -673,7 +673,7 @@ class DownloadQueue:
         elif etype == 'video' or (etype.startswith('url') and 'id' in entry and 'title' in entry):
             log.debug('Processing as a video')
             url = entry.get('webpage_url') or entry['url']
-            dl = DownloadInfo(entry['id'], entry.get('title') or entry['id'], url, quality, format, folder, custom_name_prefix, error, entry, playlist_item_limit)
+            dl = DownloadInfo(entry['id'], entry.get('title') or entry['id'], url, quality, format, folder, custom_name_prefix, error, entry, playlist_item_limit, split_by_chapters, chapter_template)
             if not self.queue.exists(dl.id):
                 dldirectory, error_message = self.__calc_download_path(quality, format, folder)
                 if error_message is not None:
