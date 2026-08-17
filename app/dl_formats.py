@@ -26,6 +26,39 @@ CODEC_FILTER_MAP = {
 }
 
 
+def _default_video_format(quality: str) -> str:
+    """Prefer HEVC up to 4K/60, with an H.264 1080p fallback."""
+    if quality == "best":
+        fallback_limit = "[height<=1080]"
+        high_quality_limit = 2160
+    elif quality == "worst":
+        fallback_limit = "[height<=1080]"
+        high_quality_limit = None
+    else:
+        fallback_limit = f"[height<={quality}]"
+        high_quality_limit = min(int(quality), 2160) if int(quality) > 1080 else None
+
+    high_quality = (
+        f"bestvideo[height>1080][height<={high_quality_limit}][fps<=60]"
+        "[vcodec~='^(h265|hevc)']"
+        if high_quality_limit is not None else ""
+    )
+
+    mp4_video = f"bestvideo{fallback_limit}[ext=mp4][vcodec~='^(h264|avc)']"
+    mp4_fallback = f"bestvideo{fallback_limit}[ext=mp4]"
+    audio = "bestaudio[ext=m4a]"
+    high_audio = "bestaudio"
+
+    if high_quality:
+        # A high-resolution HEVC stream is preferred; if it is unavailable,
+        # deliberately fall back to an MP4 stream at or below the target.
+        return (
+            f"{high_quality}+{high_audio}/"
+            f"{mp4_video}+{audio}/{mp4_fallback}+{audio}/best{fallback_limit}[ext=mp4]"
+        )
+    return f"{mp4_video}+{audio}/{mp4_fallback}+{audio}/worst{fallback_limit}[ext=mp4]"
+
+
 def _normalize_caption_mode(mode: str) -> str:
     mode = (mode or "").strip()
     return mode if mode in CAPTION_MODES else "prefer_manual"
@@ -85,6 +118,9 @@ def get_format(download_type: str, codec: str, format: str, quality: str) -> str
 
         if format == "ios":
             return f"bestvideo[vcodec~='^((he|a)vc|h26[45])']{vres}+bestaudio[acodec=aac]/bestvideo[vcodec~='^((he|a)vc|h26[45])']{vres}+bestaudio{afmt}/bestvideo{vcombo}+bestaudio{afmt}/best{vcombo}"
+
+        if codec == "auto":
+            return _default_video_format(quality)
 
         if codec_filter:
             return f"bestvideo{codec_filter}{vcombo}+bestaudio{afmt}/bestvideo{vcombo}+bestaudio{afmt}/best{vcombo}"

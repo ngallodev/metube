@@ -49,8 +49,8 @@ class DlFormatsTests(unittest.TestCase):
 
     def test_video_any_mp4_ios_with_height_quality(self):
         self.assertIn("height<=1080", get_format("video", "auto", "any", "1080"))
-        self.assertNotIn("height<=", get_format("video", "auto", "any", "best"))
-        self.assertNotIn("height<=", get_format("video", "auto", "any", "worst"))
+        self.assertIn("height<=1080", get_format("video", "auto", "any", "best"))
+        self.assertIn("height<=1080", get_format("video", "auto", "any", "worst"))
 
     def test_video_codec_filters(self):
         self.assertIn("h264", get_format("video", "h264", "any", "best"))
@@ -61,6 +61,33 @@ class DlFormatsTests(unittest.TestCase):
     def test_video_mp4_includes_m4a_audio(self):
         s = get_format("video", "auto", "mp4", "720")
         self.assertIn("[ext=m4a]", s)
+
+    def test_video_auto_caps_targets_at_1080p_mp4(self):
+        s = get_format("video", "auto", "any", "1080")
+        self.assertIn("height<=1080", s)
+        self.assertIn("[ext=mp4]", s)
+        self.assertIn("[vcodec~='^(h264|avc)']", s)
+        self.assertNotIn("height>1080", s)
+
+    def test_video_auto_prefers_hevc_above_1080p(self):
+        s = get_format("video", "auto", "any", "1440")
+        self.assertIn("height>1080", s)
+        self.assertIn("height<=1440", s)
+        self.assertIn("fps<=60", s)
+        self.assertIn("[vcodec~='^(h265|hevc)']", s)
+        self.assertIn("height<=1440", s[s.index("/"):])
+
+    def test_video_auto_best_prefers_high_resolution_hevc(self):
+        s = get_format("video", "auto", "any", "best")
+        self.assertTrue(s.startswith("bestvideo[height>1080][height<=2160][fps<=60]"))
+        self.assertIn("height<=1080", s)
+        self.assertIn("[vcodec~='^(h264|avc)']", s)
+
+    def test_video_auto_2160_caps_hevc_at_4k_and_60fps(self):
+        s = get_format("video", "auto", "any", "2160")
+        self.assertIn("height<=2160", s)
+        self.assertIn("fps<=60", s)
+        self.assertIn("[vcodec~='^(h265|hevc)']", s)
 
     def test_video_ios_selector_contains_avc_pattern(self):
         s = get_format("video", "auto", "ios", "best")
