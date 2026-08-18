@@ -1,0 +1,24 @@
+services:
+  metube:
+#    image: ghcr.io/alexta69/metube
+    build: ./
+    container_name: metube
+    restart: unless-stopped
+    environment:
+      - 'GID=1002'
+      - 'UMASK=002'
+      - 'TEMP_DIR=/tmp/metube_tmp'
+      - 'DOWNLOAD_MODE=concurrent'
+      # - 'YTDL_OPTIONS=--write-info-json --write-description --embed-chapters --embed-info-json --write-description --embed-thumbnail --embed-metadata -t mkv --restrict-filenames'
+      - 'YTDL_OPTIONS_FILE=/app/ytdl-options.json'
+      - 'CUSTOM_DIRS=true'
+      - 'CREATE_CUSTOM_DIRS=true'
+      - 'OUTPUT_TEMPLATE=%(title)s.%(ext)s'
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./ytdl-options.json:/app/ytdl-options.json
+      - /usr/local/bin/yt-dlp:/usr/local/bin/yt-dlp
+      - /lump/share/media/Adult/downloads/metube:/downloads
+    #  - /lump/share/media/youtube:/youtube
+    #  - /lump/share/media/Adult/:/adult

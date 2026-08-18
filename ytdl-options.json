@@ -1,0 +1,45 @@
+{
+   "final_ext": "mp4",
+   "format_sort": ["vcodec:h264",
+                 "lang",
+                 "quality",
+                 "res",
+                 "fps",
+                 "hdr:12",
+                 "acodec:aac"],
+    "merge_output_format": "mp4",
+    "impersonate": "chrome",
+    "extract_flat": "discard_in_playlist",
+    "fragment_retries": 10,
+    "embed_metadata": true,
+    "ignoreerrors": "only_download",
+    "outtmpl": {
+        "pl_thumbnail": ""
+    },
+    "parse_metadata": [
+        "%(webpage_url)s:%(meta_comment)s"
+    ],
+    "postprocessors": [
+        {  
+          "key": "FFmpegVideoRemuxer", 
+          "preferedformat": "mp4"
+        },
+        {
+            "add_chapters": true,
+            "add_infojson": true,
+            "add_metadata": true,
+            "key": "FFmpegMetadata"
+        },
+        {
+            "key": "FFmpegConcat",
+            "only_multi_video": true,
+            "when": "playlist"
+        }
+    ],
+    "restrictfilenames": true,
+    "retries": 10,
+    "warn_when_outdated": true,
+    "writedescription": true,
+    "writeinfojson": true,
+    "writethumbnail": false
+}
